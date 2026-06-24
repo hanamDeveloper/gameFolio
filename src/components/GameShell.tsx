@@ -6,6 +6,7 @@ import { CompletionCelebration } from "@/components/CompletionCelebration";
 import GameCanvas from "@/components/GameCanvas";
 import { ContentOverlay } from "@/components/ContentOverlay";
 import { CoinBurst, GameHUD, JumpFeedback } from "@/components/GameUI";
+import { QuickTravelBar } from "@/components/QuickTravelBar";
 import { QuestReveal } from "@/components/QuestReveal";
 import { MobileControls } from "@/components/MobileControls";
 import { TutorialOverlay } from "@/components/TutorialOverlay";
@@ -17,6 +18,8 @@ import { setBuildingCheckpoint } from "@/game/checkpoint";
 import { COINS, FLAGS, INTERACTIONS } from "@/game/constants";
 import { getContentByInteractionId } from "@/game/content";
 import { bindKeyboardInput, consumeInteract, queueMobileInteract } from "@/game/input";
+import { requestTeleport } from "@/game/teleport";
+import { getTravelDestination } from "@/game/travel";
 import { loadProgress, saveProgress } from "@/game/progress";
 import { getActiveQuest, isExplorationComplete, isQuestMilestone } from "@/game/quests";
 import { playCoinSound, playCompletionFanfare, playDiscoverySound, playFlagSound, playZoneSound } from "@/game/sounds";
@@ -97,7 +100,8 @@ export default function GameShell() {
     showTutorial,
   };
 
-  const paused = !gameStarted || contentId !== null || showTutorial || showCelebration;
+  const paused =
+    !gameStarted || contentId !== null || showTutorial || showCelebration;
 
   const questProgress = {
     buildingsVisited,
@@ -122,6 +126,21 @@ export default function GameShell() {
 
   const handleBgmToggle = useCallback(() => {
     setBgmOn(toggleBgmEnabled());
+  }, []);
+
+  const handleOpenBuilding = useCallback((destinationId: string) => {
+    const dest = getTravelDestination(destinationId);
+    if (!dest) return;
+
+    const platform = INTERACTIONS.find((z) => z.id === dest.contentId)?.platform;
+    if (platform) setBuildingCheckpoint(platform);
+
+    requestTeleport(dest.position);
+    setBuildingsVisited((prev) =>
+      prev.includes(dest.contentId) ? prev : [...prev, dest.contentId],
+    );
+    setContentId(dest.contentId);
+    playDiscoverySound();
   }, []);
 
   const handleGameStart = useCallback(async () => {
@@ -354,10 +373,8 @@ export default function GameShell() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        if (showTutorial) {
-          setShowTutorial(false);
-        }
+      if (e.code === "Escape" && showTutorial) {
+        setShowTutorial(false);
       }
     };
 
@@ -449,6 +466,11 @@ export default function GameShell() {
           enterPrompt={enterBuilding ? { title: enterBuilding.title } : null}
           bgmOn={bgmOn}
           onBgmToggle={handleBgmToggle}
+        />
+
+        <QuickTravelBar
+          visitedIds={buildingsVisited}
+          onOpenBuilding={handleOpenBuilding}
         />
 
         {zoneFlash && <ZoneTransition zone={zoneFlash} visible={!!zoneFlash} />}

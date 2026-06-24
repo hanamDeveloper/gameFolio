@@ -22,6 +22,7 @@ import { getBuildingCheckpoint } from "../checkpoint";
 import { cameraState } from "../cameraControls";
 import { inputState } from "../input";
 import { playJumpSound, playLandSound } from "../sounds";
+import { consumeTeleport } from "../teleport";
 import type { CloudBubbleState, GameState, JumpFeedbackLabel } from "../types";
 import {
   checkpointFromPlatform,
@@ -196,6 +197,17 @@ export const Player = forwardRef<RapierRigidBody, PlayerProps>(function Player(
   useFrame(({ clock }, delta) => {
     const body = bodyRef.current;
     if (!body) return;
+
+    const teleport = consumeTeleport();
+    if (teleport) {
+      const [x, y, z] = teleport;
+      body.setTranslation({ x, y, z }, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      checkpoint.current = teleport;
+      jumpsRemaining.current = MAX_JUMPS;
+      wallJumpUsed.current = false;
+      respawnCooldown.current = 0.35;
+    }
 
     const pos = body.translation();
     const vel = body.linvel();
